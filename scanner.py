@@ -1,115 +1,49 @@
 import json
-import os
-import sys
 import time
-import urllib.request
+import websocket
 
 WS_URL = "wss://api.derivws.com/trading/v1/options/ws/public"
 
-# Instruments we want to monitor.
-WATCHLIST = [
-    "XAUUSD",
-    "XAGUSD",
-    "XAUEUR",
-    "XAGEUR",
-    "EURUSD",
-    "GBPUSD",
-    "BTCUSD",
-]
-
-TIMEFRAMES = {
-    "5m": 300,
-    "15m": 900,
-    "1h": 3600,
-    "4h": 14400,
-}
-
-
-def get_active_symbols(ws):
-    ws.send(json.dumps({"active_symbols": "brief", "req_id": 1}))
-
-    while True:
-        response = json.loads(ws.recv())
-
-        if response.get("req_id") == 1:
-            if "error" in response:
-                raise RuntimeError(response["error"]["message"])
-
-            return response.get("active_symbols", [])
-
-
-def get_candles(ws, symbol, seconds):
-    ws.send(json.dumps({
-        "ticks_history": symbol,
-        "end": "latest",
-        "count": 100,
-        "style": "candles",
-        "granularity": seconds,
-        "req_id": 2
-    }))
-
-    while True:
-        response = json.loads(ws.recv())
-
-        if response.get("req_id") == 2:
-            if "error" in response:
-                raise RuntimeError(response["error"]["message"])
-
-            return response.get("candles", [])
-
-
 def main():
-    try:
-        import websocket
-    except ImportError:
-        print("Missing websocket-client package.")
-        sys.exit(1)
+    print("DERIV MARKET SCANNER")
+    print("Starting connection...")
 
-    ws = websocket.create_connection(WS_URL, timeout=20)
+    ws = websocket.create_connection(WS_URL, timeout=30)
 
     try:
-        available = get_active_symbols(ws)
+        ws.send(json.dumps({
+            "active_symbols": "brief",
+            "req_id": 1
+        }))
 
-        # Match requested instruments to Deriv's actual symbol codes.
-        found = {}
+        while True:
+            data = json.loads(ws.recv())
 
-        for item in available:
-            name = item.get("display_name", "").upper()
-            code = item.get("symbol", "")
+            if data.get("req_id") == 1:
+                if "error" in data:
+                    print("API ERROR:", data["error"])
+                    return
 
-            for wanted in WATCHLIST:
-                if name == wanted:
-                    found[wanted] = code
+                symbols = data.get("active_symbols", [])
 
-        print("DERIV MARKET SCAN")
-        print("Time:", time.strftime("%Y-%m-%d %H:%M UTC"))
-        print("-" * 35)
+                print("TOTAL AVAILABLE SYMBOLS:", len(symbols))
+                print("--------------------------------")
 
-        for wanted in WATCHLIST:
-            code = found.get(wanted)
+                for item in symbols:
+                    name = item.get("display_name", "")
+                    code = item.get("symbol", "")
 
-            if not code:
-                print(wanted, "- NOT FOUND on Deriv")
-                continue
+                    text = (name + " " + code).lower()
 
-            print("\n", wanted, "(", code, ")")
+                    if any(word in text for word in [
+                        "gold", "silver", "bitcoin",
+                        "eur", "usd", "gbp", "btc"
+                    ]):
+                        print(name, "|", code)
 
-            for timeframe, seconds in TIMEFRAMES.items():
-                candles = get_candles(ws, code, seconds)
-
-                if candles:
-                    last = candles[-1]
-                    print(
-                        timeframe,
-                        "Close:", last.get("close"),
-                        "Candles:", len(candles)
-                    )
-                else:
-                    print(timeframe, "- No candle data")
-
-        print("\nScan completed.")
-        print("This version checks market data only.")
-        print("It does NOT generate trading signals or place trades.")
+                print("--------------------------------")
+                print("SCAN COMPLETED")
+                break
 
     finally:
         ws.close()
