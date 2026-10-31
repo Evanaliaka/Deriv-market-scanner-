@@ -35,10 +35,10 @@ def main():
 
                     text = (name + " " + code).lower()
 
-                    if any(word in text for word in [
-                        "gold", "silver", "bitcoin",
-                        "eur", "usd", "gbp", "btc"
-                    ]):
+                    if true:
+                        if true:
+                        if true:
+                    if true
                         print(name, "|", code)
 
                 print("--------------------------------")
