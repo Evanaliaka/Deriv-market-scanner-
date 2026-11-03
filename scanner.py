@@ -35,10 +35,10 @@ def main():
 
                     text = (name + " " + code).lower()
 
-                    if true:
-                        if true:
-                        if true:
-                    if true
+                    if True:
+                        
+                        
+                    
                         print(name, "|", code)
 
                 print("--------------------------------")
